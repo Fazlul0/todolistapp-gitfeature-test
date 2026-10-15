@@ -23,6 +23,12 @@
       border: 1px solid #ccc;
       border-radius: 6px;
     }
+    input[type="date"] {
+      padding: 8px 10px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
     button {
       padding: 8px 14px;
       font-size: 14px;
@@ -44,6 +50,10 @@
     li.completed span { text-decoration: line-through; color: #888; }
     li input[type="checkbox"] { transform: scale(1.2); }
     li span { flex: 1; word-break: break-word; }
+    li span.text { flex: 1; word-break: break-word; }
+    li .due { font-size: 12px; color: #888; }
+    li.overdue:not(.completed) .due { color: #c0392b; font-weight: 600; }
+    li.due-soon:not(.completed) .due { color: #b45309; }
     .delete {
       background: transparent;
       color: #c0392b;
@@ -82,6 +92,7 @@
   <h1>Todo</h1>
   <form id="form">
     <input id="input" type="text" placeholder="What needs doing?" autofocus />
+    <input id="due" type="date" />
     <button type="submit">Add</button>
   </form>
   <ul id="list"></ul>
@@ -100,6 +111,7 @@
     const STORAGE_KEY = "todoapp.items.v1";
     const form = document.getElementById("form");
     const input = document.getElementById("input");
+    const dueInput = document.getElementById("due");
     const list = document.getElementById("list");
     const empty = document.getElementById("empty");
     const footer = document.getElementById("footer");
@@ -136,6 +148,10 @@
       clearBtn.hidden = !items.some((x) => x.done);
       filterBtns.forEach((b) => b.classList.toggle("active", b.dataset.filter === filter));
 
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const MS = 86400000;
+
       for (const item of visible) {
         const li = document.createElement("li");
         if (item.done) li.classList.add("completed");
@@ -150,6 +166,7 @@
         });
 
         const span = document.createElement("span");
+        span.className = "text";
         span.textContent = item.text;
         span.title = "Double-click to edit";
         span.addEventListener("dblclick", () => startEdit(li, span, item));
@@ -164,7 +181,22 @@
           render();
         });
 
-        li.append(cb, span, del);
+        li.append(cb, span);
+        if (item.due) {
+          const d = new Date(item.due + "T00:00:00");
+          const diffDays = Math.round((d - today) / MS);
+          const due = document.createElement("span");
+          due.className = "due";
+          due.textContent =
+            diffDays < 0 ? `Overdue · ${formatDate(d)}` :
+            diffDays === 0 ? `Due today` :
+            diffDays === 1 ? `Due tomorrow` :
+            `Due ${formatDate(d)}`;
+          if (diffDays < 0) li.classList.add("overdue");
+          else if (diffDays <= 3) li.classList.add("due-soon");
+          li.append(due);
+        }
+        li.append(del);
         list.appendChild(li);
       }
     }
@@ -210,12 +242,17 @@
       render();
     });
 
+    function formatDate(d) {
+      return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    }
+
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       const text = input.value.trim();
       if (!text) return;
-      items.push({ id: Date.now(), text, done: false });
+      items.push({ id: Date.now(), text, done: false, due: dueInput.value || null });
       input.value = "";
+      dueInput.value = "";
       input.focus();
       save();
       render();
