@@ -7,89 +7,257 @@
   <style>
     * { box-sizing: border-box; }
     [hidden] { display: none !important; }
+
+    :root {
+      color-scheme: light dark;
+      --bg: #f4f6fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --hover: #f3f4f6;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --primary-soft: #eff6ff;
+      --danger: #dc2626;
+      --danger-soft: #fee2e2;
+      --warn: #b45309;
+      --warn-soft: #fef3c7;
+      --shadow: 0 10px 30px -12px rgba(15, 23, 42, 0.18);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f172a;
+        --card: #1e293b;
+        --text: #f1f5f9;
+        --muted: #94a3b8;
+        --border: #334155;
+        --hover: #273449;
+        --primary: #60a5fa;
+        --primary-hover: #93c5fd;
+        --primary-soft: #1e3a5f;
+        --danger: #f87171;
+        --danger-soft: #4a1a1a;
+        --warn: #fbbf24;
+        --warn-soft: #4a3a1a;
+        --shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.5);
+      }
+    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      max-width: 480px;
-      margin: 40px auto;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 520px;
+      margin: 60px auto;
       padding: 0 16px;
-      color: #222;
+      color: var(--text);
+      background: var(--bg);
+      min-height: 100vh;
+      transition: background 0.2s ease, color 0.2s ease;
     }
-    h1 { margin: 0 0 16px; font-size: 24px; }
-    form { display: flex; gap: 8px; margin-bottom: 16px; }
-    input[type="text"] {
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: var(--shadow);
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+    h1 {
+      margin: 0 0 20px;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    h1 .icon { font-size: 24px; }
+    form { display: flex; gap: 8px; margin-bottom: 20px; }
+    input[type="text"], input[type="date"] {
       flex: 1;
-      padding: 8px 10px;
-      font-size: 16px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 15px;
+      color: var(--text);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
-    input[type="date"] {
-      padding: 8px 10px;
-      font-size: 16px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
+    input[type="date"] { flex: 0 0 auto; }
+    input[type="text"]:focus, input[type="date"]:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-soft);
     }
     button {
-      padding: 8px 14px;
+      padding: 10px 16px;
       font-size: 14px;
+      font-weight: 600;
       border: none;
-      background: #2563eb;
+      background: var(--primary);
       color: white;
-      border-radius: 6px;
+      border-radius: 10px;
       cursor: pointer;
+      transition: background 0.15s, transform 0.05s;
     }
-    button:hover { background: #1d4ed8; }
+    button:hover { background: var(--primary-hover); }
+    button:active { transform: scale(0.98); }
+    button:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px var(--primary-soft);
+    }
     ul { list-style: none; padding: 0; margin: 0; }
     li {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 8px 0;
-      border-bottom: 1px solid #eee;
+      gap: 10px;
+      padding: 12px 4px;
+      border-bottom: 1px solid var(--border);
+      transition: opacity 0.2s, transform 0.2s;
     }
-    li.completed span { text-decoration: line-through; color: #888; }
-    li input[type="checkbox"] { transform: scale(1.2); }
-    li span { flex: 1; word-break: break-word; }
-    li span.text { flex: 1; word-break: break-word; }
-    li .due { font-size: 12px; color: #888; }
-    li.overdue:not(.completed) .due { color: #c0392b; font-weight: 600; }
-    li.due-soon:not(.completed) .due { color: #b45309; }
+    li:last-child { border-bottom: none; }
+    li.completed { opacity: 0.6; }
+    li.completed .text { text-decoration: line-through; color: var(--muted); }
+
+    .check {
+      position: relative;
+      width: 20px;
+      height: 20px;
+      flex: 0 0 20px;
+      cursor: pointer;
+    }
+    .check input {
+      position: absolute;
+      opacity: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      cursor: pointer;
+    }
+    .check .box {
+      position: absolute;
+      inset: 0;
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      background: var(--card);
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .check .box::after {
+      content: "";
+      position: absolute;
+      left: 5px;
+      top: 1px;
+      width: 6px;
+      height: 11px;
+      border: solid white;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg) scale(0);
+      transition: transform 0.15s ease;
+    }
+    .check input:checked + .box {
+      background: var(--primary);
+      border-color: var(--primary);
+    }
+    .check input:checked + .box::after { transform: rotate(45deg) scale(1); }
+    .check input:focus-visible + .box {
+      box-shadow: 0 0 0 3px var(--primary-soft);
+    }
+
+    .text {
+      flex: 1;
+      word-break: break-word;
+      cursor: text;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: background 0.1s;
+    }
+    .text:hover { background: var(--hover); }
+
+    .due {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--hover);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    li.overdue:not(.completed) .due {
+      background: var(--danger-soft);
+      color: var(--danger);
+    }
+    li.due-soon:not(.completed) .due {
+      background: var(--warn-soft);
+      color: var(--warn);
+    }
+
     .delete {
       background: transparent;
-      color: #c0392b;
+      color: var(--muted);
       padding: 4px 8px;
+      border-radius: 6px;
+      font-weight: 500;
+      transition: background 0.15s, color 0.15s;
     }
-    .delete:hover { background: #fde8e6; }
-    .empty { color: #888; font-style: italic; }
+    .delete:hover { background: var(--danger-soft); color: var(--danger); }
+
+    .empty {
+      color: var(--muted);
+      text-align: center;
+      padding: 24px 0;
+      font-style: italic;
+    }
     li .edit {
       flex: 1;
-      padding: 4px 6px;
-      font-size: 16px;
-      border: 1px solid #2563eb;
-      border-radius: 4px;
+      padding: 6px 8px;
+      font-size: 15px;
+      color: var(--text);
+      background: var(--card);
+      border: 1px solid var(--primary);
+      border-radius: 6px;
+      outline: none;
+      box-shadow: 0 0 0 3px var(--primary-soft);
     }
     footer {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 8px;
-      margin-top: 12px;
-      font-size: 14px;
-      color: #555;
+      gap: 12px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--muted);
+      flex-wrap: wrap;
     }
     .filters { display: flex; gap: 4px; }
     .filters button, .clear {
       background: transparent;
-      color: #555;
-      padding: 4px 8px;
+      color: var(--muted);
+      padding: 6px 10px;
       border: 1px solid transparent;
+      border-radius: 8px;
+      font-weight: 500;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
     }
-    .filters button:hover, .clear:hover { background: #f1f5f9; }
-    .filters button.active { border-color: #2563eb; color: #2563eb; }
+    .filters button:hover, .clear:hover {
+      background: var(--hover);
+      color: var(--text);
+    }
+    .filters button.active {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: var(--primary-soft);
+    }
+    .clear:hover { color: var(--danger); }
   </style>
 </head>
 <body>
-  <h1>Todo</h1>
+  <div class="card">
+    <h1><span class="icon" aria-hidden="true">✅</span> Todo</h1>
   <form id="form">
     <input id="input" type="text" placeholder="What needs doing?" autofocus />
     <input id="due" type="date" />
@@ -106,6 +274,7 @@
     </div>
     <button type="button" id="clear" class="clear">Clear completed</button>
   </footer>
+  </div>
 
   <script>
     const STORAGE_KEY = "todoapp.items.v1";
@@ -159,6 +328,12 @@
         const cb = document.createElement("input");
         cb.type = "checkbox";
         cb.checked = item.done;
+        cb.setAttribute("aria-label", "Mark done");
+        const check = document.createElement("label");
+        check.className = "check";
+        const box = document.createElement("span");
+        box.className = "box";
+        check.append(cb, box);
         cb.addEventListener("change", () => {
           item.done = cb.checked;
           save();
@@ -174,14 +349,15 @@
         const del = document.createElement("button");
         del.className = "delete";
         del.type = "button";
-        del.textContent = "Delete";
+        del.textContent = "×";
+        del.setAttribute("aria-label", "Delete");
         del.addEventListener("click", () => {
           items = items.filter((x) => x.id !== item.id);
           save();
           render();
         });
 
-        li.append(cb, span);
+        li.append(check, span);
         if (item.due) {
           const d = new Date(item.due + "T00:00:00");
           const diffDays = Math.round((d - today) / MS);
