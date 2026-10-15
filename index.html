@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Todo</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      max-width: 480px;
+      margin: 40px auto;
+      padding: 0 16px;
+      color: #222;
+    }
+    h1 { margin: 0 0 16px; font-size: 24px; }
+    form { display: flex; gap: 8px; margin-bottom: 16px; }
+    input[type="text"] {
+      flex: 1;
+      padding: 8px 10px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    button {
+      padding: 8px 14px;
+      font-size: 14px;
+      border: none;
+      background: #2563eb;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover { background: #1d4ed8; }
+    ul { list-style: none; padding: 0; margin: 0; }
+    li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid #eee;
+    }
+    li.completed span { text-decoration: line-through; color: #888; }
+    li input[type="checkbox"] { transform: scale(1.2); }
+    li span { flex: 1; word-break: break-word; }
+    .delete {
+      background: transparent;
+      color: #c0392b;
+      padding: 4px 8px;
+    }
+    .delete:hover { background: #fde8e6; }
+    .empty { color: #888; font-style: italic; }
+  </style>
+</head>
+<body>
+  <h1>Todo</h1>
+  <form id="form">
+    <input id="input" type="text" placeholder="What needs doing?" autofocus />
+    <button type="submit">Add</button>
+  </form>
+  <ul id="list"></ul>
+  <p id="empty" class="empty" hidden>Nothing here yet.</p>
+
+  <script>
+    const STORAGE_KEY = "todoapp.items.v1";
+    const form = document.getElementById("form");
+    const input = document.getElementById("input");
+    const list = document.getElementById("list");
+    const empty = document.getElementById("empty");
+
+    let items = load();
+
+    function load() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      } catch {
+        return [];
+      }
+    }
+
+    function save() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    }
+
+    function render() {
+      list.innerHTML = "";
+      empty.hidden = items.length > 0;
+      for (const item of items) {
+        const li = document.createElement("li");
+        if (item.done) li.classList.add("completed");
+
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = item.done;
+        cb.addEventListener("change", () => {
+          item.done = cb.checked;
+          save();
+          render();
+        });
+
+        const span = document.createElement("span");
+        span.textContent = item.text;
+
+        const del = document.createElement("button");
+        del.className = "delete";
+        del.type = "button";
+        del.textContent = "Delete";
+        del.addEventListener("click", () => {
+          items = items.filter((x) => x.id !== item.id);
+          save();
+          render();
+        });
+
+        li.append(cb, span, del);
+        list.appendChild(li);
+      }
+    }
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      items.push({ id: Date.now(), text, done: false });
+      input.value = "";
+      input.focus();
+      save();
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>
