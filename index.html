@@ -6,6 +6,7 @@
   <title>Todo</title>
   <style>
     * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       max-width: 480px;
@@ -50,6 +51,31 @@
     }
     .delete:hover { background: #fde8e6; }
     .empty { color: #888; font-style: italic; }
+    li .edit {
+      flex: 1;
+      padding: 4px 6px;
+      font-size: 16px;
+      border: 1px solid #2563eb;
+      border-radius: 4px;
+    }
+    footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 12px;
+      font-size: 14px;
+      color: #555;
+    }
+    .filters { display: flex; gap: 4px; }
+    .filters button, .clear {
+      background: transparent;
+      color: #555;
+      padding: 4px 8px;
+      border: 1px solid transparent;
+    }
+    .filters button:hover, .clear:hover { background: #f1f5f9; }
+    .filters button.active { border-color: #2563eb; color: #2563eb; }
   </style>
 </head>
 <body>
@@ -60,6 +86,15 @@
   </form>
   <ul id="list"></ul>
   <p id="empty" class="empty" hidden>Nothing here yet.</p>
+  <footer id="footer" hidden>
+    <span id="count"></span>
+    <div class="filters">
+      <button type="button" data-filter="all">All</button>
+      <button type="button" data-filter="active">Active</button>
+      <button type="button" data-filter="completed">Completed</button>
+    </div>
+    <button type="button" id="clear" class="clear">Clear completed</button>
+  </footer>
 
   <script>
     const STORAGE_KEY = "todoapp.items.v1";
@@ -67,8 +102,13 @@
     const input = document.getElementById("input");
     const list = document.getElementById("list");
     const empty = document.getElementById("empty");
+    const footer = document.getElementById("footer");
+    const count = document.getElementById("count");
+    const clearBtn = document.getElementById("clear");
+    const filterBtns = document.querySelectorAll("[data-filter]");
 
     let items = load();
+    let filter = "all";
 
     function load() {
       try {
@@ -84,8 +124,19 @@
 
     function render() {
       list.innerHTML = "";
-      empty.hidden = items.length > 0;
-      for (const item of items) {
+      const visible = items.filter((x) =>
+        filter === "active" ? !x.done : filter === "completed" ? x.done : true
+      );
+      empty.hidden = visible.length > 0;
+      empty.textContent = items.length === 0 ? "Nothing here yet." : `No ${filter} todos.`;
+
+      const left = items.filter((x) => !x.done).length;
+      footer.hidden = items.length === 0;
+      count.textContent = `${left} item${left === 1 ? "" : "s"} left`;
+      clearBtn.hidden = !items.some((x) => x.done);
+      filterBtns.forEach((b) => b.classList.toggle("active", b.dataset.filter === filter));
+
+      for (const item of visible) {
         const li = document.createElement("li");
         if (item.done) li.classList.add("completed");
 
@@ -100,6 +151,8 @@
 
         const span = document.createElement("span");
         span.textContent = item.text;
+        span.title = "Double-click to edit";
+        span.addEventListener("dblclick", () => startEdit(li, span, item));
 
         const del = document.createElement("button");
         del.className = "delete";
@@ -115,6 +168,47 @@
         list.appendChild(li);
       }
     }
+
+    function startEdit(li, span, item) {
+      const edit = document.createElement("input");
+      edit.type = "text";
+      edit.className = "edit";
+      edit.value = item.text;
+      li.replaceChild(edit, span);
+      edit.focus();
+      edit.select();
+
+      let finished = false;
+      const finish = (commit) => {
+        if (finished) return;
+        finished = true;
+        if (commit) {
+          const text = edit.value.trim();
+          if (text) item.text = text;
+          else items = items.filter((x) => x.id !== item.id);
+          save();
+        }
+        render();
+      };
+      edit.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") finish(true);
+        else if (e.key === "Escape") finish(false);
+      });
+      edit.addEventListener("blur", () => finish(true));
+    }
+
+    filterBtns.forEach((b) =>
+      b.addEventListener("click", () => {
+        filter = b.dataset.filter;
+        render();
+      })
+    );
+
+    clearBtn.addEventListener("click", () => {
+      items = items.filter((x) => !x.done);
+      save();
+      render();
+    });
 
     form.addEventListener("submit", (e) => {
       e.preventDefault();
