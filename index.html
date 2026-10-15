@@ -155,6 +155,35 @@
       border-color: var(--primary);
       box-shadow: 0 0 0 3px var(--primary-soft);
     }
+    .search {
+      position: relative;
+      margin-bottom: 12px;
+    }
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      pointer-events: none;
+      opacity: 0.6;
+    }
+    .search input[type="search"] {
+      width: 100%;
+      padding: 10px 12px 10px 36px;
+      font-size: 14px;
+      color: var(--text);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .search input[type="search"]:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-soft);
+    }
+    .search input[type="search"]::-webkit-search-cancel-button { cursor: pointer; }
     .cat {
       display: inline-flex;
       align-items: center;
@@ -173,6 +202,20 @@
     .cat.cat-shopping  { background: #ea580c; }
     .cat.cat-urgent    { background: #dc2626; }
     .cat.cat-none      { display: none; }
+
+    /* Repeat badge */
+    .repeat {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      white-space: nowrap;
+    }
 
     .check {
       position: relative;
@@ -308,6 +351,38 @@
       background: var(--primary-soft);
     }
     .clear:hover { color: var(--danger); }
+
+    /* Undo toast */
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translate(-50%, 20px);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 10px 10px 10px 16px;
+      font-size: 14px;
+      color: var(--card);
+      background: var(--text);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+      pointer-events: auto;
+    }
+    .toast button {
+      padding: 6px 12px;
+      background: transparent;
+      color: inherit;
+      border: 1px solid currentColor;
+    }
+    .toast button:hover { background: rgba(128, 128, 128, 0.25); }
   </style>
 </head>
 <body>
@@ -316,6 +391,12 @@
   <form id="form">
     <input id="input" type="text" placeholder="What needs doing?" autofocus />
     <input id="due" type="date" />
+    <select id="repeat" aria-label="Repeat">
+      <option value="none">No repeat</option>
+      <option value="daily">Daily</option>
+      <option value="weekly">Weekly</option>
+      <option value="monthly">Monthly</option>
+    </select>
     <select id="category" aria-label="Category">
       <option value="none">No category</option>
       <option value="work">🟦 Work</option>
@@ -325,6 +406,10 @@
     </select>
     <button type="submit">Add</button>
   </form>
+  <div class="search">
+    <span class="search-icon" aria-hidden="true">🔍</span>
+    <input id="search" type="search" placeholder="Search…" aria-label="Search todos" />
+  </div>
   <ul id="list"></ul>
   <p id="empty" class="empty" hidden>Nothing here yet.</p>
   <footer id="footer" hidden>
@@ -337,6 +422,10 @@
     <button type="button" id="clear" class="clear">Clear completed</button>
   </footer>
   </div>
+  <div id="toast" class="toast" role="status" aria-live="polite">
+    <span id="toast-msg"></span>
+    <button type="button" id="undo">Undo</button>
+  </div>
 
   <script>
     const STORAGE_KEY = "todoapp.items.v1";
@@ -344,7 +433,20 @@
     const input = document.getElementById("input");
     const dueInput = document.getElementById("due");
     const categorySelect = document.getElementById("category");
+    const repeatSelect = document.getElementById("repeat");
+    const searchInput = document.getElementById("search");
     const CATEGORIES = { none: null, work: "Work", personal: "Personal", shopping: "Shopping", urgent: "Urgent" };
+    const REPEAT_LABELS = { daily: "↻ Daily", weekly: "↻ Weekly", monthly: "↻ Monthly" };
+    let query = "";
+
+    function nextDue(repeat, fromIso) {
+      if (!repeat || repeat === "none") return null;
+      const base = fromIso ? new Date(fromIso + "T00:00:00") : new Date();
+      if (repeat === "daily")   base.setDate(base.getDate() + 1);
+      if (repeat === "weekly")  base.setDate(base.getDate() + 7);
+      if (repeat === "monthly") base.setMonth(base.getMonth() + 1);
+      return base.toISOString().slice(0, 10);
+    }
     const list = document.getElementById("list");
     const empty = document.getElementById("empty");
     const footer = document.getElementById("footer");
@@ -352,8 +454,47 @@
     const clearBtn = document.getElementById("clear");
     const filterBtns = document.querySelectorAll("[data-filter]");
 
+    const toast = document.getElementById("toast");
+    const toastMsg = document.getElementById("toast-msg");
+    const undoBtn = document.getElementById("undo");
+    const UNDO_MS = 5000;
+    let lastRemoved = null;
+    let toastTimer = null;
+
     let items = load();
     let filter = "all";
+
+    function removeWithUndo(predicate) {
+      const removed = [];
+      items.forEach((item, index) => { if (predicate(item)) removed.push({ item, index }); });
+      if (removed.length === 0) return;
+      lastRemoved = removed;
+      items = items.filter((x) => !predicate(x));
+      save();
+      render();
+      toastMsg.textContent = removed.length === 1
+        ? `Deleted "${removed[0].item.text}"`
+        : `Deleted ${removed.length} todos`;
+      toast.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(hideToast, UNDO_MS);
+    }
+
+    function hideToast() {
+      toast.classList.remove("show");
+      lastRemoved = null;
+    }
+
+    undoBtn.addEventListener("click", () => {
+      if (!lastRemoved) return;
+      for (const { item, index } of lastRemoved) {
+        items.splice(Math.min(index, items.length), 0, item);
+      }
+      clearTimeout(toastTimer);
+      hideToast();
+      save();
+      render();
+    });
 
     function load() {
       try {
@@ -369,7 +510,9 @@
 
     function render() {
       list.innerHTML = "";
-      const visible = items.filter((x) =>
+      const q = query.trim().toLowerCase();
+    const searched = q ? items.filter((x) => x.text.toLowerCase().includes(q)) : items;
+    const visible = searched.filter((x) =>
         filter === "active" ? !x.done : filter === "completed" ? x.done : true
       );
       empty.hidden = visible.length > 0;
@@ -400,6 +543,13 @@
         check.append(cb, box);
         cb.addEventListener("change", () => {
           item.done = cb.checked;
+          // Reschedule recurring todos on completion
+          if (item.done && item.repeat && item.repeat !== "none") {
+            const next = nextDue(item.repeat, item.due);
+            item.done = false;
+            item.due = next;
+            cb.checked = false;
+          }
           save();
           render();
         });
@@ -450,11 +600,7 @@
         del.type = "button";
         del.textContent = "×";
         del.setAttribute("aria-label", "Delete");
-        del.addEventListener("click", () => {
-          items = items.filter((x) => x.id !== item.id);
-          save();
-          render();
-        });
+        del.addEventListener("click", () => removeWithUndo((x) => x.id === item.id));
 
         li.append(handle, check, span);
         if (item.category && item.category !== "none") {
@@ -462,6 +608,12 @@
           cat.className = `cat cat-${item.category}`;
           cat.textContent = CATEGORIES[item.category] || item.category;
           li.append(cat);
+        }
+        if (item.repeat && item.repeat !== "none") {
+          const rep = document.createElement("span");
+          rep.className = "repeat";
+          rep.textContent = REPEAT_LABELS[item.repeat] || item.repeat;
+          li.append(rep);
         }
         if (item.due) {
           const d = new Date(item.due + "T00:00:00");
@@ -495,10 +647,10 @@
       const finish = (commit) => {
         if (finished) return;
         finished = true;
+        const text = edit.value.trim();
+        if (commit && !text) return removeWithUndo((x) => x.id === item.id);
         if (commit) {
-          const text = edit.value.trim();
-          if (text) item.text = text;
-          else items = items.filter((x) => x.id !== item.id);
+          item.text = text;
           save();
         }
         render();
@@ -517,11 +669,7 @@
       })
     );
 
-    clearBtn.addEventListener("click", () => {
-      items = items.filter((x) => !x.done);
-      save();
-      render();
-    });
+    clearBtn.addEventListener("click", () => removeWithUndo((x) => x.done));
 
     function formatDate(d) {
       return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
@@ -531,16 +679,22 @@
       e.preventDefault();
       const text = input.value.trim();
       if (!text) return;
-      items.push({ id: Date.now(), text, done: false, due: dueInput.value || null, category: categorySelect.value });
+      items.push({ id: Date.now(), text, done: false, due: dueInput.value || null, category: categorySelect.value, repeat: repeatSelect.value });
       input.value = "";
       dueInput.value = "";
       categorySelect.value = "none";
+      repeatSelect.value = "none";
       input.focus();
       save();
       render();
     });
 
     render();
+
+    searchInput.addEventListener("input", () => {
+      query = searchInput.value;
+      render();
+    });
   </script>
 </body>
 </html>
