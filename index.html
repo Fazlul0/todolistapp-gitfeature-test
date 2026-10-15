@@ -119,6 +119,25 @@
     li.completed { opacity: 0.6; }
     li.completed .text { text-decoration: line-through; color: var(--muted); }
 
+    /* Drag handle */
+    .handle {
+      cursor: grab;
+      color: var(--muted);
+      opacity: 0;
+      padding: 2px 2px;
+      border-radius: 4px;
+      font-size: 16px;
+      line-height: 1;
+      user-select: none;
+      transition: opacity 0.15s, background 0.15s, color 0.15s;
+      flex: 0 0 auto;
+    }
+    li:hover .handle { opacity: 1; }
+    .handle:hover, .handle:focus-visible { background: var(--hover); color: var(--text); outline: none; }
+    .handle:active { cursor: grabbing; }
+    li.dragging { opacity: 0.4; }
+    li.drag-over { border-top: 2px solid var(--primary); }
+
     .check {
       position: relative;
       width: 20px;
@@ -346,6 +365,41 @@
         span.title = "Double-click to edit";
         span.addEventListener("dblclick", () => startEdit(li, span, item));
 
+        const handle = document.createElement("span");
+        handle.className = "handle";
+        handle.textContent = "⋮⋮";
+        handle.setAttribute("aria-label", "Drag to reorder");
+        handle.setAttribute("draggable", "true");
+        handle.addEventListener("dragstart", (e) => {
+          li.classList.add("dragging");
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", String(item.id));
+        });
+        handle.addEventListener("dragend", () => {
+          li.classList.remove("dragging");
+          list.querySelectorAll(".drag-over").forEach((el) => el.classList.remove("drag-over"));
+        });
+        li.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          if (li.classList.contains("dragging")) return;
+          list.querySelectorAll(".drag-over").forEach((el) => el.classList.remove("drag-over"));
+          li.classList.add("drag-over");
+        });
+        li.addEventListener("dragleave", () => li.classList.remove("drag-over"));
+        li.addEventListener("drop", (e) => {
+          e.preventDefault();
+          const id = Number(e.dataTransfer.getData("text/plain"));
+          if (!id || id === item.id) return;
+          const fromIdx = items.findIndex((x) => x.id === id);
+          const toIdx = items.findIndex((x) => x.id === item.id);
+          if (fromIdx === -1 || toIdx === -1) return;
+          const [moved] = items.splice(fromIdx, 1);
+          items.splice(toIdx, 0, moved);
+          save();
+          render();
+        });
+
         const del = document.createElement("button");
         del.className = "delete";
         del.type = "button";
@@ -357,7 +411,7 @@
           render();
         });
 
-        li.append(check, span);
+        li.append(handle, check, span);
         if (item.due) {
           const d = new Date(item.due + "T00:00:00");
           const diffDays = Math.round((d - today) / MS);
