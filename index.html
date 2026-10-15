@@ -110,6 +110,7 @@
     li {
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
       gap: 10px;
       padding: 12px 4px;
       border-bottom: 1px solid var(--border);
@@ -137,6 +138,41 @@
     .handle:active { cursor: grabbing; }
     li.dragging { opacity: 0.4; }
     li.drag-over { border-top: 2px solid var(--primary); }
+
+    /* Category chips */
+    select#category {
+      padding: 10px 12px;
+      font-size: 14px;
+      color: var(--text);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    select#category:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-soft);
+    }
+    .cat {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 2px 8px;
+      border-radius: 999px;
+      color: white;
+      white-space: nowrap;
+    }
+    .cat.cat-work      { background: #2563eb; }
+    .cat.cat-personal  { background: #16a34a; }
+    .cat.cat-shopping  { background: #ea580c; }
+    .cat.cat-urgent    { background: #dc2626; }
+    .cat.cat-none      { display: none; }
 
     .check {
       position: relative;
@@ -280,6 +316,13 @@
   <form id="form">
     <input id="input" type="text" placeholder="What needs doing?" autofocus />
     <input id="due" type="date" />
+    <select id="category" aria-label="Category">
+      <option value="none">No category</option>
+      <option value="work">🟦 Work</option>
+      <option value="personal">🟩 Personal</option>
+      <option value="shopping">🟧 Shopping</option>
+      <option value="urgent">🟥 Urgent</option>
+    </select>
     <button type="submit">Add</button>
   </form>
   <ul id="list"></ul>
@@ -300,6 +343,8 @@
     const form = document.getElementById("form");
     const input = document.getElementById("input");
     const dueInput = document.getElementById("due");
+    const categorySelect = document.getElementById("category");
+    const CATEGORIES = { none: null, work: "Work", personal: "Personal", shopping: "Shopping", urgent: "Urgent" };
     const list = document.getElementById("list");
     const empty = document.getElementById("empty");
     const footer = document.getElementById("footer");
@@ -412,6 +457,12 @@
         });
 
         li.append(handle, check, span);
+        if (item.category && item.category !== "none") {
+          const cat = document.createElement("span");
+          cat.className = `cat cat-${item.category}`;
+          cat.textContent = CATEGORIES[item.category] || item.category;
+          li.append(cat);
+        }
         if (item.due) {
           const d = new Date(item.due + "T00:00:00");
           const diffDays = Math.round((d - today) / MS);
@@ -480,9 +531,10 @@
       e.preventDefault();
       const text = input.value.trim();
       if (!text) return;
-      items.push({ id: Date.now(), text, done: false, due: dueInput.value || null });
+      items.push({ id: Date.now(), text, done: false, due: dueInput.value || null, category: categorySelect.value });
       input.value = "";
       dueInput.value = "";
+      categorySelect.value = "none";
       input.focus();
       save();
       render();
