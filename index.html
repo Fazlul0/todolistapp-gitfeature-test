@@ -155,6 +155,35 @@
       border-color: var(--primary);
       box-shadow: 0 0 0 3px var(--primary-soft);
     }
+    .search {
+      position: relative;
+      margin-bottom: 12px;
+    }
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      pointer-events: none;
+      opacity: 0.6;
+    }
+    .search input[type="search"] {
+      width: 100%;
+      padding: 10px 12px 10px 36px;
+      font-size: 14px;
+      color: var(--text);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .search input[type="search"]:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-soft);
+    }
+    .search input[type="search"]::-webkit-search-cancel-button { cursor: pointer; }
     .cat {
       display: inline-flex;
       align-items: center;
@@ -173,6 +202,20 @@
     .cat.cat-shopping  { background: #ea580c; }
     .cat.cat-urgent    { background: #dc2626; }
     .cat.cat-none      { display: none; }
+
+    /* Repeat badge */
+    .repeat {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      white-space: nowrap;
+    }
 
     .check {
       position: relative;
@@ -316,6 +359,12 @@
   <form id="form">
     <input id="input" type="text" placeholder="What needs doing?" autofocus />
     <input id="due" type="date" />
+    <select id="repeat" aria-label="Repeat">
+      <option value="none">No repeat</option>
+      <option value="daily">Daily</option>
+      <option value="weekly">Weekly</option>
+      <option value="monthly">Monthly</option>
+    </select>
     <select id="category" aria-label="Category">
       <option value="none">No category</option>
       <option value="work">🟦 Work</option>
@@ -325,6 +374,10 @@
     </select>
     <button type="submit">Add</button>
   </form>
+  <div class="search">
+    <span class="search-icon" aria-hidden="true">🔍</span>
+    <input id="search" type="search" placeholder="Search…" aria-label="Search todos" />
+  </div>
   <ul id="list"></ul>
   <p id="empty" class="empty" hidden>Nothing here yet.</p>
   <footer id="footer" hidden>
@@ -344,7 +397,20 @@
     const input = document.getElementById("input");
     const dueInput = document.getElementById("due");
     const categorySelect = document.getElementById("category");
+    const repeatSelect = document.getElementById("repeat");
+    const searchInput = document.getElementById("search");
     const CATEGORIES = { none: null, work: "Work", personal: "Personal", shopping: "Shopping", urgent: "Urgent" };
+    const REPEAT_LABELS = { daily: "↻ Daily", weekly: "↻ Weekly", monthly: "↻ Monthly" };
+    let query = "";
+
+    function nextDue(repeat, fromIso) {
+      if (!repeat || repeat === "none") return null;
+      const base = fromIso ? new Date(fromIso + "T00:00:00") : new Date();
+      if (repeat === "daily")   base.setDate(base.getDate() + 1);
+      if (repeat === "weekly")  base.setDate(base.getDate() + 7);
+      if (repeat === "monthly") base.setMonth(base.getMonth() + 1);
+      return base.toISOString().slice(0, 10);
+    }
     const list = document.getElementById("list");
     const empty = document.getElementById("empty");
     const footer = document.getElementById("footer");
@@ -369,7 +435,9 @@
 
     function render() {
       list.innerHTML = "";
-      const visible = items.filter((x) =>
+      const q = query.trim().toLowerCase();
+    const searched = q ? items.filter((x) => x.text.toLowerCase().includes(q)) : items;
+    const visible = searched.filter((x) =>
         filter === "active" ? !x.done : filter === "completed" ? x.done : true
       );
       empty.hidden = visible.length > 0;
@@ -400,6 +468,13 @@
         check.append(cb, box);
         cb.addEventListener("change", () => {
           item.done = cb.checked;
+          // Reschedule recurring todos on completion
+          if (item.done && item.repeat && item.repeat !== "none") {
+            const next = nextDue(item.repeat, item.due);
+            item.done = false;
+            item.due = next;
+            cb.checked = false;
+          }
           save();
           render();
         });
@@ -462,6 +537,12 @@
           cat.className = `cat cat-${item.category}`;
           cat.textContent = CATEGORIES[item.category] || item.category;
           li.append(cat);
+        }
+        if (item.repeat && item.repeat !== "none") {
+          const rep = document.createElement("span");
+          rep.className = "repeat";
+          rep.textContent = REPEAT_LABELS[item.repeat] || item.repeat;
+          li.append(rep);
         }
         if (item.due) {
           const d = new Date(item.due + "T00:00:00");
@@ -531,16 +612,22 @@
       e.preventDefault();
       const text = input.value.trim();
       if (!text) return;
-      items.push({ id: Date.now(), text, done: false, due: dueInput.value || null, category: categorySelect.value });
+      items.push({ id: Date.now(), text, done: false, due: dueInput.value || null, category: categorySelect.value, repeat: repeatSelect.value });
       input.value = "";
       dueInput.value = "";
       categorySelect.value = "none";
+      repeatSelect.value = "none";
       input.focus();
       save();
       render();
     });
 
     render();
+
+    searchInput.addEventListener("input", () => {
+      query = searchInput.value;
+      render();
+    });
   </script>
 </body>
 </html>
