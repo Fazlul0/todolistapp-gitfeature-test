@@ -496,12 +496,26 @@
       render();
     });
 
+    function newId() {
+      return crypto.randomUUID
+        ? crypto.randomUUID()
+        : Date.now().toString(36) + Math.random().toString(36).slice(2);
+    }
+
     function load() {
+      let stored;
       try {
-        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        stored = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
       } catch {
         return [];
       }
+      // Older saves used Date.now() ids, which can collide; give duplicates fresh ids.
+      const seen = new Set();
+      for (const item of stored) {
+        if (item.id == null || seen.has(item.id)) item.id = newId();
+        seen.add(item.id);
+      }
+      return stored;
     }
 
     function save() {
@@ -584,9 +598,9 @@
         li.addEventListener("dragleave", () => li.classList.remove("drag-over"));
         li.addEventListener("drop", (e) => {
           e.preventDefault();
-          const id = Number(e.dataTransfer.getData("text/plain"));
-          if (!id || id === item.id) return;
-          const fromIdx = items.findIndex((x) => x.id === id);
+          const id = e.dataTransfer.getData("text/plain");
+          if (!id || id === String(item.id)) return;
+          const fromIdx = items.findIndex((x) => String(x.id) === id);
           const toIdx = items.findIndex((x) => x.id === item.id);
           if (fromIdx === -1 || toIdx === -1) return;
           const [moved] = items.splice(fromIdx, 1);
@@ -679,7 +693,7 @@
       e.preventDefault();
       const text = input.value.trim();
       if (!text) return;
-      items.push({ id: Date.now(), text, done: false, due: dueInput.value || null, category: categorySelect.value, repeat: repeatSelect.value });
+      items.push({ id: newId(), text, done: false, due: dueInput.value || null, category: categorySelect.value, repeat: repeatSelect.value });
       input.value = "";
       dueInput.value = "";
       categorySelect.value = "none";
