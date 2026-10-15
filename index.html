@@ -408,8 +408,20 @@
       const base = fromIso ? new Date(fromIso + "T00:00:00") : new Date();
       if (repeat === "daily")   base.setDate(base.getDate() + 1);
       if (repeat === "weekly")  base.setDate(base.getDate() + 7);
-      if (repeat === "monthly") base.setMonth(base.getMonth() + 1);
-      return base.toISOString().slice(0, 10);
+      if (repeat === "monthly") {
+        const day = base.getDate();
+        base.setDate(1);
+        base.setMonth(base.getMonth() + 1);
+        const lastDay = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
+        base.setDate(Math.min(day, lastDay));
+      }
+      return toIsoDate(base);
+    }
+
+    // Local-date YYYY-MM-DD; toISOString() would shift the day in non-UTC timezones.
+    function toIsoDate(d) {
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     }
     const list = document.getElementById("list");
     const empty = document.getElementById("empty");
@@ -436,12 +448,16 @@
     function render() {
       list.innerHTML = "";
       const q = query.trim().toLowerCase();
-    const searched = q ? items.filter((x) => x.text.toLowerCase().includes(q)) : items;
-    const visible = searched.filter((x) =>
+      const searched = q ? items.filter((x) => x.text.toLowerCase().includes(q)) : items;
+      const visible = searched.filter((x) =>
         filter === "active" ? !x.done : filter === "completed" ? x.done : true
       );
       empty.hidden = visible.length > 0;
-      empty.textContent = items.length === 0 ? "Nothing here yet." : `No ${filter} todos.`;
+      empty.textContent =
+        items.length === 0 ? "Nothing here yet." :
+        q ? `No todos match "${query.trim()}".` :
+        filter === "all" ? "Nothing here yet." :
+        `No ${filter} todos.`;
 
       const left = items.filter((x) => !x.done).length;
       footer.hidden = items.length === 0;
